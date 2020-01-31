@@ -17,6 +17,7 @@ package io.gravitee.rest.api.management.rest.resource.configuration.identity;
 
 import io.gravitee.common.http.MediaType;
 import io.gravitee.rest.api.model.configuration.identity.IdentityProviderEntity;
+import io.gravitee.rest.api.model.configuration.identity.IdentityProviderType;
 import io.gravitee.rest.api.model.configuration.identity.NewIdentityProviderEntity;
 import io.gravitee.rest.api.model.permissions.RolePermission;
 import io.gravitee.rest.api.model.permissions.RolePermissionAction;
@@ -25,6 +26,7 @@ import io.gravitee.rest.api.management.rest.resource.AbstractResource;
 import io.gravitee.rest.api.management.rest.security.Permission;
 import io.gravitee.rest.api.management.rest.security.Permissions;
 import io.gravitee.rest.api.service.configuration.identity.IdentityProviderService;
+import io.gravitee.rest.api.service.exceptions.IdentityProviderActionException;
 import io.swagger.annotations.*;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,6 +74,7 @@ public class IdentityProvidersResource extends AbstractResource {
             item.setCreatedAt(identityProvider.getCreatedAt());
             item.setUpdatedAt(identityProvider.getUpdatedAt());
             item.setSync(identityProvider.isSyncMappings());
+            item.setOrder(identityProvider.getOrder());
             return item;
         }).collect(Collectors.toList());
     }
@@ -87,6 +90,9 @@ public class IdentityProvidersResource extends AbstractResource {
             @ApiResponse(code = 500, message = "Internal server error")})
     public Response createIdentityProvider(
             @ApiParam(name = "identity-provider", required = true) @Valid @NotNull NewIdentityProviderEntity newIdentityProviderEntity) {
+        if (newIdentityProviderEntity.getType() == IdentityProviderType.MEMORY || newIdentityProviderEntity.getType() == IdentityProviderType.GRAVITEE) {
+            throw new IdentityProviderActionException("Create", newIdentityProviderEntity.getType());
+        }
         IdentityProviderEntity newIdentityProvider = identityProviderService.create(newIdentityProviderEntity);
 
         if (newIdentityProvider != null) {

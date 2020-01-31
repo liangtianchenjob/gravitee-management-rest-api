@@ -57,4 +57,10 @@ public class IdentityProviderRepositoryProxy extends AbstractProxy<IdentityProvi
             IdentityProviderReferenceType referenceType) throws TechnicalException {
         return target.findAllByReferenceIdAndReferenceType(referenceId, referenceType);
     }
+
+    @Override
+    public Integer findMaxIdentityProviderReferenceIdAndReferenceTypeOrder(String referenceId,
+            IdentityProviderReferenceType referenceType) throws TechnicalException {
+        return target.findMaxIdentityProviderReferenceIdAndReferenceTypeOrder(referenceId, referenceType);
+    }
 }
