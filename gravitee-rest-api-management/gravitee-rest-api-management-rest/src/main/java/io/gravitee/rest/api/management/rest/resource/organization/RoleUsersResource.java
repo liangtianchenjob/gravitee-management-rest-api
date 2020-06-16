@@ -13,9 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.rest.api.management.rest.resource;
+package io.gravitee.rest.api.management.rest.resource.organization;
 
 import io.gravitee.common.http.MediaType;
+import io.gravitee.rest.api.management.rest.model.RoleMembership;
+import io.gravitee.rest.api.management.rest.resource.AbstractResource;
+import io.gravitee.rest.api.management.rest.security.Permission;
+import io.gravitee.rest.api.management.rest.security.Permissions;
 import io.gravitee.rest.api.model.MemberEntity;
 import io.gravitee.rest.api.model.MembershipMemberType;
 import io.gravitee.rest.api.model.MembershipReferenceType;
@@ -23,15 +27,11 @@ import io.gravitee.rest.api.model.RoleEntity;
 import io.gravitee.rest.api.model.permissions.RolePermission;
 import io.gravitee.rest.api.model.permissions.RolePermissionAction;
 import io.gravitee.rest.api.model.permissions.RoleScope;
-import io.gravitee.rest.api.management.rest.model.RoleMembership;
-import io.gravitee.rest.api.management.rest.security.Permission;
-import io.gravitee.rest.api.management.rest.security.Permissions;
 import io.gravitee.rest.api.service.MembershipService;
 import io.gravitee.rest.api.service.common.GraviteeContext;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
-
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.validation.Valid;
@@ -49,7 +49,7 @@ import java.util.stream.Collectors;
  * @author GraviteeSource Team
  */
 @Api(tags = {"Roles"})
-public class RoleUsersResource extends AbstractResource  {
+public class RoleUsersResource extends AbstractResource {
 
     @Context
     private ResourceContext resourceContext;
@@ -63,31 +63,21 @@ public class RoleUsersResource extends AbstractResource  {
             @Permission(value = RolePermission.ORGANIZATION_ROLE, acls = RolePermissionAction.READ)
     })
     public List<MembershipListItem> listUsersPerRole(
-            @PathParam("scope")RoleScope scope,
+            @PathParam("scope") RoleScope scope,
             @PathParam("role") String role) {
-        if (RoleScope.ORGANIZATION.equals(scope) || RoleScope.ENVIRONMENT.equals(scope)) {
+        if (RoleScope.ORGANIZATION.equals(scope)) {
             Optional<RoleEntity> optRole = roleService.findByScopeAndName(scope, role);
-            if(optRole.isPresent()) {
-                MembershipReferenceType referenceType = null;
-                String referenceId = null;
-                
-                if(RoleScope.ORGANIZATION.equals(scope)) {
-                    referenceType = MembershipReferenceType.ORGANIZATION;
-                    referenceId = GraviteeContext.getCurrentOrganization();
-                } else if(RoleScope.ENVIRONMENT.equals(scope)) {
-                    referenceType = MembershipReferenceType.ENVIRONMENT;
-                    referenceId = GraviteeContext.getCurrentEnvironment();
-                }
+            if (optRole.isPresent()) {
                 Set<MemberEntity> members = membershipService.getMembersByReferenceAndRole(
-                        referenceType,
-                        referenceId,
+                        MembershipReferenceType.ORGANIZATION,
+                        GraviteeContext.getCurrentOrganization(),
                         optRole.get().getId());
-    
+
                 return members
                         .stream()
                         .filter(Objects::nonNull)
                         .map(MembershipListItem::new)
-                        .sorted((a,b) -> {
+                        .sorted((a, b) -> {
                             if (a.getDisplayName() == null && b.getDisplayName() == null) {
                                 return a.getId().compareToIgnoreCase(b.getId());
                             }
@@ -116,7 +106,7 @@ public class RoleUsersResource extends AbstractResource  {
     })
     public Response addRoleToUser(
             @ApiParam(name = "scope", required = true, allowableValues = "ORGANIZATION,ENVIRONMENT")
-            @PathParam("scope")RoleScope roleScope,
+            @PathParam("scope") RoleScope roleScope,
             @PathParam("role") String roleName,
             @Valid @NotNull final RoleMembership roleMembership) {
 
@@ -125,20 +115,13 @@ public class RoleUsersResource extends AbstractResource  {
         }
         MembershipReferenceType referenceType = null;
         String referenceId = null;
-        
-        if(RoleScope.ORGANIZATION.equals(roleScope)) {
-            referenceType = MembershipReferenceType.ORGANIZATION;
-            referenceId = GraviteeContext.getCurrentOrganization();
-        } else if(RoleScope.ENVIRONMENT.equals(roleScope)) {
-            referenceType = MembershipReferenceType.ENVIRONMENT;
-            referenceId = GraviteeContext.getCurrentEnvironment();
-        }
-        if( referenceType == null || referenceId == null) {
+
+        if (!RoleScope.ORGANIZATION.equals(roleScope)) {
             return Response.status(Response.Status.BAD_REQUEST).entity("Can't determine context").build();
         }
-        
+
         MemberEntity membership = membershipService.addRoleToMemberOnReference(
-                new MembershipService.MembershipReference(referenceType, referenceId),
+                new MembershipService.MembershipReference(MembershipReferenceType.ORGANIZATION, GraviteeContext.getCurrentOrganization()),
                 new MembershipService.MembershipMember(roleMembership.getId(), roleMembership.getReference(), MembershipMemberType.USER),
                 new MembershipService.MembershipRole(roleScope, roleName));
 

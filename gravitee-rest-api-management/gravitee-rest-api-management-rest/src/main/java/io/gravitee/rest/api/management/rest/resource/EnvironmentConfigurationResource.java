@@ -18,16 +18,15 @@ package io.gravitee.rest.api.management.rest.resource;
 import io.gravitee.common.http.MediaType;
 import io.gravitee.repository.management.model.NotificationReferenceType;
 import io.gravitee.repository.management.model.PortalNotificationDefaultReferenceId;
+import io.gravitee.rest.api.management.rest.resource.configuration.application.registration.ClientRegistrationProvidersResource;
+import io.gravitee.rest.api.management.rest.resource.configuration.dictionary.DictionariesResource;
 import io.gravitee.rest.api.management.rest.resource.quality.QualityRulesResource;
+import io.gravitee.rest.api.management.rest.security.Permission;
+import io.gravitee.rest.api.management.rest.security.Permissions;
 import io.gravitee.rest.api.model.configuration.application.ApplicationTypesEntity;
 import io.gravitee.rest.api.model.notification.NotifierEntity;
 import io.gravitee.rest.api.model.permissions.RolePermission;
 import io.gravitee.rest.api.model.permissions.RolePermissionAction;
-import io.gravitee.rest.api.management.rest.resource.configuration.application.registration.ClientRegistrationProvidersResource;
-import io.gravitee.rest.api.management.rest.resource.configuration.dictionary.DictionariesResource;
-import io.gravitee.rest.api.management.rest.resource.configuration.identity.IdentityProvidersResource;
-import io.gravitee.rest.api.management.rest.security.Permission;
-import io.gravitee.rest.api.management.rest.security.Permissions;
 import io.gravitee.rest.api.service.NotifierService;
 import io.gravitee.rest.api.service.configuration.application.ApplicationTypeService;
 import io.gravitee.rest.api.service.notification.Hook;
@@ -51,7 +50,7 @@ import java.util.List;
  * @author GraviteeSource Team
  */
 @Api(tags = {"Configuration"})
-public class ConfigurationResource {
+public class EnvironmentConfigurationResource {
 
     @Context
     private ResourceContext resourceContext;
@@ -105,11 +104,6 @@ public class ConfigurationResource {
         return resourceContext.getResource(MetadataResource.class);
     }
 
-    @Path("rolescopes")
-    public RoleScopesResource getRoleScopesResource() {
-        return resourceContext.getResource(RoleScopesResource.class);
-    }
-
     @Path("notificationsettings")
     public PortalNotificationSettingsResource getNotificationSettingsResource() {
         return resourceContext.getResource(PortalNotificationSettingsResource.class);
@@ -133,11 +127,6 @@ public class ConfigurationResource {
     @Path("apiheaders")
     public ApiHeadersResource getApiHeadersResource() {
         return resourceContext.getResource(ApiHeadersResource.class);
-    }
-
-    @Path("identities")
-    public IdentityProvidersResource getAuthenticationProvidersResource() {
-        return resourceContext.getResource(IdentityProvidersResource.class);
     }
 
     @Path("applications/registration/providers")

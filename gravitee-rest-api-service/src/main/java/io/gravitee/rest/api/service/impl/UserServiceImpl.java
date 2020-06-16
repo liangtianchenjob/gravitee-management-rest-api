@@ -29,7 +29,6 @@ import io.gravitee.repository.management.api.UserRepository;
 import io.gravitee.repository.management.api.search.UserCriteria;
 import io.gravitee.repository.management.api.search.builder.PageableBuilder;
 import io.gravitee.repository.management.model.User;
-import io.gravitee.repository.management.model.UserReferenceType;
 import io.gravitee.repository.management.model.UserStatus;
 import io.gravitee.rest.api.model.*;
 import io.gravitee.rest.api.model.application.ApplicationSettings;
@@ -94,6 +93,16 @@ public class UserServiceImpl extends AbstractService implements UserService {
     private static final String IDP_SOURCE_GRAVITEE = "gravitee";
     private static final String TEMPLATE_ENGINE_PROFILE_ATTRIBUTE = "profile";
 
+    // Dirty hack: only used to force class loading
+    static {
+        try {
+            LOGGER.trace("Loading class to initialize properly JsonPath Cache provider: {}",
+                    Class.forName(JsonPathFunction.class.getName()));
+        } catch (ClassNotFoundException ignored) {
+            LOGGER.trace("Loading class to initialize properly JsonPath Cache provider : fail");
+        }
+    }
+
     @Autowired
     private UserRepository userRepository;
     @Autowired
@@ -134,24 +143,13 @@ public class UserServiceImpl extends AbstractService implements UserService {
     private PasswordValidator passwordValidator;
     @Autowired
     private TokenService tokenService;
-
+    @Autowired
+    private EnvironmentService environmentService;
     @Value("${user.login.defaultApplication:true}")
     private boolean defaultApplicationForFirstConnection;
-
     @Value("${user.anonymize-on-delete.enabled:false}")
     private boolean anonymizeOnDelete;
-
     private PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-
-    // Dirty hack: only used to force class loading
-    static {
-        try {
-            LOGGER.trace("Loading class to initialize properly JsonPath Cache provider: {}",
-                    Class.forName(JsonPathFunction.class.getName()));
-        } catch (ClassNotFoundException ignored) {
-            LOGGER.trace("Loading class to initialize properly JsonPath Cache provider : fail");
-        }
-    }
 
     @Override
     public UserEntity connect(String userId) {
@@ -253,7 +251,7 @@ public class UserServiceImpl extends AbstractService implements UserService {
         try {
             LOGGER.debug("Find user by source[{}] user[{}]", source, sourceId);
 
-            Optional<User> optionalUser = userRepository.findBySource(source, sourceId, GraviteeContext.getCurrentOrganization(), UserReferenceType.ORGANIZATION);
+            Optional<User> optionalUser = userRepository.findBySource(source, sourceId, GraviteeContext.getCurrentOrganization());
 
             if (optionalUser.isPresent()) {
                 return convert(optionalUser.get(), loadRoles);
@@ -347,7 +345,7 @@ public class UserServiceImpl extends AbstractService implements UserService {
                 Optional<User> checkUser = userRepository.findById(username);
                 user = checkUser.orElseThrow(() -> new UserNotFoundException(username));
                 if (StringUtils.isNotBlank(user.getPassword())) {
-                    throw new UserAlreadyFinalizedException(GraviteeContext.getCurrentEnvironment());
+                    throw new UserAlreadyFinalizedException(GraviteeContext.getCurrentOrganization());
                 }
             }
 
@@ -436,24 +434,22 @@ public class UserServiceImpl extends AbstractService implements UserService {
     @Override
     public UserEntity create(NewExternalUserEntity newExternalUserEntity, boolean addDefaultRole) {
         try {
-            String referenceId = GraviteeContext.getCurrentOrganization();
-            UserReferenceType referenceType = UserReferenceType.ORGANIZATION;
+            String organizationId = GraviteeContext.getCurrentOrganization();
 
             // First we check that organization exist
-            this.organizationService.findById(referenceId);
+            this.organizationService.findById(organizationId);
 
             LOGGER.debug("Create an external user {}", newExternalUserEntity);
             Optional<User> checkUser = userRepository.findBySource(
-                    newExternalUserEntity.getSource(), newExternalUserEntity.getSourceId(), referenceId, referenceType);
+                    newExternalUserEntity.getSource(), newExternalUserEntity.getSourceId(), organizationId);
 
             if (checkUser.isPresent()) {
-                throw new UserAlreadyExistsException(newExternalUserEntity.getSource(), newExternalUserEntity.getSourceId(), referenceId, referenceType);
+                throw new UserAlreadyExistsException(newExternalUserEntity.getSource(), newExternalUserEntity.getSourceId(), organizationId);
             }
 
             User user = convert(newExternalUserEntity);
             user.setId(RandomString.generate());
-            user.setReferenceId(referenceId);
-            user.setReferenceType(referenceType);
+            user.setOrganizationId(organizationId);
             user.setStatus(UserStatus.ACTIVE);
 
             // Set date fields
@@ -528,18 +524,17 @@ public class UserServiceImpl extends AbstractService implements UserService {
      * Allows to create an user and send an email notification to finalize its creation.
      */
     private UserEntity createAndSendEmail(final NewExternalUserEntity newExternalUserEntity, final ACTION action, final String confirmationPageUrl) {
-        if (!EmailValidator.isValid(newExternalUserEntity.getEmail())){
+        if (!EmailValidator.isValid(newExternalUserEntity.getEmail())) {
             throw new EmailFormatInvalidException(newExternalUserEntity.getEmail());
         }
 
-        String referenceId = GraviteeContext.getCurrentOrganization();
-        UserReferenceType referenceType = UserReferenceType.ORGANIZATION;
+        String organizationId = GraviteeContext.getCurrentOrganization();
 
         final Optional<User> optionalUser;
         try {
-            optionalUser = userRepository.findBySource(IDP_SOURCE_GRAVITEE, newExternalUserEntity.getEmail(), referenceId, referenceType);
+            optionalUser = userRepository.findBySource(IDP_SOURCE_GRAVITEE, newExternalUserEntity.getEmail(), organizationId);
             if (optionalUser.isPresent()) {
-                throw new UserAlreadyExistsException(IDP_SOURCE_GRAVITEE, newExternalUserEntity.getEmail(), referenceId, referenceType);
+                throw new UserAlreadyExistsException(IDP_SOURCE_GRAVITEE, newExternalUserEntity.getEmail(), organizationId);
             }
         } catch (final TechnicalException e) {
             LOGGER.error("An error occurs while trying to create user {}", newExternalUserEntity.getEmail(), e);
@@ -555,7 +550,7 @@ public class UserServiceImpl extends AbstractService implements UserService {
         notifierService.trigger(ACTION.USER_REGISTRATION.equals(action) ? PortalHook.USER_REGISTERED : PortalHook.USER_CREATED, params);
         emailService.sendAsyncEmailNotification(new EmailNotificationBuilder()
                 .to(userEntity.getEmail())
-                .subject(format("User %s - %s", USER_REGISTRATION.equals(action)?"registration":"creation", userEntity.getDisplayName()))
+                .subject(format("User %s - %s", USER_REGISTRATION.equals(action) ? "registration" : "creation", userEntity.getDisplayName()))
                 .template(EmailNotificationBuilder.EmailTemplate.USER_REGISTRATION)
                 .params(params)
                 .build()
@@ -600,16 +595,16 @@ public class UserServiceImpl extends AbstractService implements UserService {
                 .withClaim(Claims.ACTION, action.name())
                 .sign(algorithm);
 
-        String registrationUrl= "";
+        String registrationUrl = "";
         if (targetPageUrl != null && !targetPageUrl.isEmpty()) {
             registrationUrl += targetPageUrl;
-            if(!targetPageUrl.endsWith("/")) {
+            if (!targetPageUrl.endsWith("/")) {
                 registrationUrl += "/";
             }
             registrationUrl += token;
         } else {
             String portalUrl = environment.getProperty("portalURL");
-            if (portalUrl!= null && portalUrl.endsWith("/")) {
+            if (portalUrl != null && portalUrl.endsWith("/")) {
                 portalUrl = portalUrl.substring(0, portalUrl.length() - 1);
             }
             registrationUrl = portalUrl + portalUri + token;
@@ -725,10 +720,9 @@ public class UserServiceImpl extends AbstractService implements UserService {
         try {
             LOGGER.debug("search users");
             UserCriteria.Builder builder = new UserCriteria.Builder()
-                    .referenceId(GraviteeContext.getCurrentOrganization())
-                    .referenceType(UserReferenceType.ORGANIZATION)
+                    .organizationId(GraviteeContext.getCurrentOrganization())
                     .statuses(criteria.getStatuses());
-            if(criteria.hasNoStatus()) {
+            if (criteria.hasNoStatus()) {
                 builder.noStatus();
             }
             UserCriteria newCriteria = builder.build();
@@ -918,7 +912,8 @@ public class UserServiceImpl extends AbstractService implements UserService {
         }
         UserEntity userEntity = new UserEntity();
 
-        userEntity.setId(user.getId());
+        final String userId = user.getId();
+        userEntity.setId(userId);
         userEntity.setSource(user.getSource());
         userEntity.setSourceId(user.getSourceId());
         userEntity.setEmail(user.getEmail());
@@ -939,21 +934,36 @@ public class UserServiceImpl extends AbstractService implements UserService {
                     MembershipReferenceType.ORGANIZATION,
                     GraviteeContext.getCurrentOrganization(),
                     MembershipMemberType.USER,
-                    user.getId());
+                    userId);
             if (!roleEntities.isEmpty()) {
                 roleEntities.forEach(roleEntity -> roles.add(convert(roleEntity)));
             }
 
-            roleEntities = membershipService.getRoles(
-                    MembershipReferenceType.ENVIRONMENT,
-                    GraviteeContext.getCurrentEnvironment(),
-                    MembershipMemberType.USER,
-                    user.getId());
-            if (!roleEntities.isEmpty()) {
-                roleEntities.forEach(roleEntity -> roles.add(convert(roleEntity)));
-            }
+            this.environmentService.findByOrganization(GraviteeContext.getCurrentOrganization()).stream()
+                    .flatMap(env -> membershipService.getRoles(
+                            MembershipReferenceType.ENVIRONMENT,
+                            env.getId(),
+                            MembershipMemberType.USER,
+                            userId).stream())
+                    .filter(Objects::nonNull)
+                    .forEach(roleEntity -> roles.add(convert(roleEntity)));
 
             userEntity.setRoles(roles);
+
+            Map<String, Set<UserRoleEntity>> envRolesMap = new HashMap<>();
+            this.environmentService.findByOrganization(GraviteeContext.getCurrentOrganization()).forEach(env -> {
+                Set<UserRoleEntity> envRoles = new HashSet<>();
+                Set<RoleEntity> envRoleEntities = membershipService.getRoles(
+                        MembershipReferenceType.ENVIRONMENT,
+                        env.getId(),
+                        MembershipMemberType.USER,
+                        userId);
+                if (!envRoleEntities.isEmpty()) {
+                    envRoleEntities.forEach(roleEntity -> envRoles.add(convert(roleEntity)));
+                }
+                envRolesMap.put(env.getId(), envRoles);
+            });
+            userEntity.setEnvRoles(envRolesMap);
         }
 
         userEntity.setLoginCount(user.getLoginCount());
@@ -976,7 +986,7 @@ public class UserServiceImpl extends AbstractService implements UserService {
 
     @Override
     public UserEntity createOrUpdateUserFromSocialIdentityProvider(SocialIdentityProviderEntity socialProvider,
-            String userInfo) {
+                                                                   String userInfo) {
         HashMap<String, String> attrs = getUserProfileAttrs(socialProvider.getUserProfileMapping(), userInfo);
 
         String email = attrs.get(SocialIdentityProviderEntity.UserProfile.EMAIL);
@@ -1051,7 +1061,7 @@ public class UserServiceImpl extends AbstractService implements UserService {
 
         if (socialProvider.getRoleMappings() != null && !socialProvider.getRoleMappings().isEmpty()) {
             Set<RoleEntity> rolesToAdd = getRolesToAddUser(userId, socialProvider.getRoleMappings(), userInfo);
-            addRolesToUser(userId, rolesToAdd);
+            addRolesToUser(userId, rolesToAdd, null, null);
         }
         return createdUser;
     }
@@ -1116,10 +1126,10 @@ public class UserServiceImpl extends AbstractService implements UserService {
 
             // Get roles
             if (match) {
-                if(mapping.getOrganizations() != null && !mapping.getOrganizations().isEmpty()) {
+                if (mapping.getOrganizations() != null && !mapping.getOrganizations().isEmpty()) {
                     mapping.getOrganizations().forEach(organizationRoleName -> addRoleScope(rolesToAdd, organizationRoleName, RoleScope.ORGANIZATION));
                 }
-                if(mapping.getEnvironments() != null && !mapping.getEnvironments().isEmpty()) {
+                if (mapping.getEnvironments() != null && !mapping.getEnvironments().isEmpty()) {
                     mapping.getEnvironments().forEach(environmentRoleName -> addRoleScope(rolesToAdd, environmentRoleName, RoleScope.ENVIRONMENT));
                 }
             }
@@ -1164,11 +1174,13 @@ public class UserServiceImpl extends AbstractService implements UserService {
 
     }
 
-    private void addRolesToUser(String userId, Collection<RoleEntity> rolesToAdd) {
+    private void addRolesToUser(String userId, Collection<RoleEntity> rolesToAdd, MembershipReferenceType referenceType, String referenceId) {
         // add roles to user
         for (RoleEntity roleEntity : rolesToAdd) {
             MembershipService.MembershipReference ref = null;
-            if (roleEntity.getScope() == RoleScope.ORGANIZATION) {
+            if (referenceType != null && referenceId != null) {
+                ref = new MembershipService.MembershipReference(referenceType, referenceId);
+            } else if (roleEntity.getScope() == RoleScope.ORGANIZATION) {
                 ref = new MembershipService.MembershipReference(
                         MembershipReferenceType.ORGANIZATION,
                         GraviteeContext.getCurrentOrganization());
@@ -1197,22 +1209,30 @@ public class UserServiceImpl extends AbstractService implements UserService {
     }
 
     @Override
-    public void updateUserRoles(String userId, List<String> roleIds) {
+    public void updateUserRoles(String userId, MembershipReferenceType referenceType, String referenceId, List<String> roleIds) {
         // check if user exist
         this.findById(userId);
 
-        Set<MembershipEntity> userMemberships = membershipService.getMembershipsByMember(MembershipMemberType.USER, userId).stream()
-                .filter(membership -> membership.getReferenceType().equals(MembershipReferenceType.ENVIRONMENT) || membership.getReferenceType().equals(MembershipReferenceType.ORGANIZATION))
-                .collect(Collectors.toSet());
-        userMemberships.forEach(membership -> {
-            if(!roleIds.contains(membership.getRoleId())) {
-                membershipService.deleteMembership(membership.getId());
-            } else {
-                roleIds.remove(membership.getRoleId());
-            }
-        });
+        MemberEntity userMember = membershipService.getUserMember(referenceType, referenceId, userId);
+        if (userMember != null) {
+            userMember.getRoles().forEach(role -> {
+                if (!roleIds.contains(role.getId())) {
+                    membershipService.removeRole(referenceType, referenceId, MembershipMemberType.USER, userId, role.getId());
+                } else {
+                    roleIds.remove(role.getId());
+                }
+            });
+        }
         if (!roleIds.isEmpty()) {
-            this.addRolesToUser(userId, roleIds.stream().map(roleService::findById).collect(Collectors.toSet()));
+            this.addRolesToUser(
+                    userId,
+                    roleIds.stream()
+                            .map(roleService::findById)
+                            .filter(role -> role.getScope().equals(RoleScope.valueOf(referenceType.name())))
+                            .collect(Collectors.toSet()),
+                    referenceType,
+                    referenceId
+            );
         }
 
     }

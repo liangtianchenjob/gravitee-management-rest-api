@@ -13,30 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.rest.api.management.rest.resource;
+package io.gravitee.rest.api.management.rest.resource.organization;
 
 import io.gravitee.common.http.MediaType;
+import io.gravitee.rest.api.management.rest.resource.AbstractResource;
+import io.gravitee.rest.api.management.rest.security.Permission;
+import io.gravitee.rest.api.management.rest.security.Permissions;
 import io.gravitee.rest.api.model.MembershipMemberType;
 import io.gravitee.rest.api.model.MembershipReferenceType;
 import io.gravitee.rest.api.model.permissions.RolePermission;
 import io.gravitee.rest.api.model.permissions.RolePermissionAction;
 import io.gravitee.rest.api.model.permissions.RoleScope;
-import io.gravitee.rest.api.management.rest.security.Permission;
-import io.gravitee.rest.api.management.rest.security.Permissions;
 import io.gravitee.rest.api.service.MembershipService;
 import io.gravitee.rest.api.service.common.GraviteeContext;
 import io.swagger.annotations.Api;
-
 import org.springframework.beans.factory.annotation.Autowired;
 
-import javax.ws.rs.*;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.PathParam;
 
 /**
  * @author Nicolas GERAUD (nicolas.geraud at graviteesource.com)
  * @author GraviteeSource Team
  */
 @Api(tags = {"Roles"})
-public class RoleUserResource extends AbstractResource  {
+public class RoleUserResource extends AbstractResource {
 
     @Autowired
     private MembershipService membershipService;
@@ -46,19 +48,13 @@ public class RoleUserResource extends AbstractResource  {
     @Permissions({
             @Permission(value = RolePermission.ORGANIZATION_ROLE, acls = RolePermissionAction.DELETE)
     })
-    public void delete(@PathParam("scope")RoleScope scope,
+    public void delete(@PathParam("scope") RoleScope scope,
                        @PathParam("role") String role,
                        @PathParam("userId") String userId) {
         if (RoleScope.ORGANIZATION.equals(scope)) {
             membershipService.deleteReferenceMember(
                     MembershipReferenceType.ORGANIZATION,
                     GraviteeContext.getCurrentOrganization(),
-                    MembershipMemberType.USER,
-                    userId);
-        } else if (RoleScope.ENVIRONMENT.equals(scope)) {
-            membershipService.deleteReferenceMember(
-                    MembershipReferenceType.ENVIRONMENT,
-                    GraviteeContext.getCurrentEnvironment(),
                     MembershipMemberType.USER,
                     userId);
         }

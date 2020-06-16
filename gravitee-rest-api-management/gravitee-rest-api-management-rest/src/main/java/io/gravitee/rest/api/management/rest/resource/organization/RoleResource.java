@@ -13,20 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.rest.api.management.rest.resource;
+package io.gravitee.rest.api.management.rest.resource.organization;
 
 import io.gravitee.common.http.MediaType;
+import io.gravitee.rest.api.management.rest.resource.AbstractResource;
+import io.gravitee.rest.api.management.rest.security.Permission;
+import io.gravitee.rest.api.management.rest.security.Permissions;
 import io.gravitee.rest.api.model.RoleEntity;
 import io.gravitee.rest.api.model.UpdateRoleEntity;
 import io.gravitee.rest.api.model.permissions.RolePermission;
 import io.gravitee.rest.api.model.permissions.RolePermissionAction;
 import io.gravitee.rest.api.model.permissions.RoleScope;
-import io.gravitee.rest.api.management.rest.security.Permission;
-import io.gravitee.rest.api.management.rest.security.Permissions;
 import io.gravitee.rest.api.service.RoleService;
 import io.gravitee.rest.api.service.exceptions.RoleNotFoundException;
 import io.swagger.annotations.Api;
-
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.validation.Valid;
@@ -34,7 +34,6 @@ import javax.validation.constraints.NotNull;
 import javax.ws.rs.*;
 import javax.ws.rs.container.ResourceContext;
 import javax.ws.rs.core.Context;
-
 import java.util.Optional;
 
 /**
@@ -42,7 +41,7 @@ import java.util.Optional;
  * @author GraviteeSource Team
  */
 @Api(tags = {"Roles"})
-public class RoleResource extends AbstractResource  {
+public class RoleResource extends AbstractResource {
 
     @Context
     private ResourceContext resourceContext;
@@ -56,11 +55,11 @@ public class RoleResource extends AbstractResource  {
     @Permissions({
             @Permission(value = RolePermission.ORGANIZATION_ROLE, acls = RolePermissionAction.READ)
     })
-    public RoleEntity get(@PathParam("scope")RoleScope scope,
+    public RoleEntity get(@PathParam("scope") RoleScope scope,
                           @PathParam("role") String role) {
 
         Optional<RoleEntity> optRole = roleService.findByScopeAndName(scope, role);
-        if(optRole.isPresent()) {
+        if (optRole.isPresent()) {
             return optRole.get();
         } else {
             throw new RoleNotFoundException(scope.name() + "_" + role);
@@ -73,7 +72,7 @@ public class RoleResource extends AbstractResource  {
     @Permissions({
             @Permission(value = RolePermission.ORGANIZATION_ROLE, acls = RolePermissionAction.UPDATE)
     })
-    public RoleEntity update(@PathParam("scope")RoleScope scope,
+    public RoleEntity update(@PathParam("scope") RoleScope scope,
                              @PathParam("role") String role,
                              @Valid @NotNull final UpdateRoleEntity entity) {
 
@@ -85,7 +84,7 @@ public class RoleResource extends AbstractResource  {
     @Permissions({
             @Permission(value = RolePermission.ORGANIZATION_ROLE, acls = RolePermissionAction.DELETE)
     })
-    public void delete(@PathParam("scope")RoleScope scope,
+    public void delete(@PathParam("scope") RoleScope scope,
                        @PathParam("role") String role) {
         roleService.findByScopeAndName(scope, role).ifPresent(roleToDelete -> roleService.delete(roleToDelete.getId()));
     }

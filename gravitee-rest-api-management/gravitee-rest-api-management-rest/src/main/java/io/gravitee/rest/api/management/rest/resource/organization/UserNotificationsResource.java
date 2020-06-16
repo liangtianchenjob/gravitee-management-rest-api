@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.rest.api.management.rest.resource;
+package io.gravitee.rest.api.management.rest.resource.organization;
 
 import io.gravitee.common.http.MediaType;
-import io.gravitee.rest.api.model.notification.PortalNotificationEntity;
 import io.gravitee.rest.api.management.rest.model.PagedResult;
+import io.gravitee.rest.api.management.rest.resource.AbstractResource;
+import io.gravitee.rest.api.model.notification.PortalNotificationEntity;
 import io.gravitee.rest.api.service.PortalNotificationService;
 import io.swagger.annotations.Api;
-
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.ws.rs.*;
@@ -34,14 +34,14 @@ import java.util.stream.Collectors;
  * @author GraviteeSource Team
  */
 @Api(tags = {"Notifications"})
-public class UserNotificationsResource extends AbstractResource  {
+public class UserNotificationsResource extends AbstractResource {
 
     @Autowired
     private PortalNotificationService portalNotificationService;
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public PagedResult<PortalNotificationEntity> list()  {
+    public PagedResult<PortalNotificationEntity> list() {
         List<PortalNotificationEntity> notifications = portalNotificationService.findByUser(getAuthenticatedUser())
                 .stream()
                 .sorted(Comparator.comparing(PortalNotificationEntity::getCreatedAt))
