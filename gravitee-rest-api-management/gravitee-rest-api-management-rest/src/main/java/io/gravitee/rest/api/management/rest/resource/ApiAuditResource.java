@@ -65,7 +65,8 @@ public class ApiAuditResource extends AbstractResource {
         query.setSize(param.getSize());
         query.setApiIds(Collections.singletonList(api));
         query.setApplicationIds(Collections.emptyList());
-        query.setManagementLogsOnly(false);
+        query.setCurrentEnvironmentLogsOnly(false);
+        query.setCurrentOrganizationLogsOnly(false);
 
         if (param.getEvent() != null) {
             query.setEvents(Collections.singletonList(param.getEvent()));
