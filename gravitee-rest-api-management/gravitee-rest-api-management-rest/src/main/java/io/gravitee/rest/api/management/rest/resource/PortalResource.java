@@ -16,18 +16,15 @@
 package io.gravitee.rest.api.management.rest.resource;
 
 import io.gravitee.common.http.MediaType;
-import io.gravitee.rest.api.model.PortalConfigEntity;
-import io.gravitee.rest.api.model.permissions.RolePermission;
 import io.gravitee.rest.api.management.rest.resource.portal.PortalApisResource;
-import io.gravitee.rest.api.management.rest.resource.portal.SocialIdentityProvidersResource;
 import io.gravitee.rest.api.management.rest.security.Permission;
 import io.gravitee.rest.api.management.rest.security.Permissions;
+import io.gravitee.rest.api.model.PortalConfigEntity;
+import io.gravitee.rest.api.model.permissions.RolePermission;
 import io.gravitee.rest.api.service.ConfigService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
-
-import static io.gravitee.rest.api.model.permissions.RolePermissionAction.*;
 
 import javax.inject.Inject;
 import javax.validation.constraints.NotNull;
@@ -35,6 +32,8 @@ import javax.ws.rs.*;
 import javax.ws.rs.container.ResourceContext;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+
+import static io.gravitee.rest.api.model.permissions.RolePermissionAction.*;
 
 /**
  * Defines the REST resources to manage Portal.
@@ -82,14 +81,10 @@ public class PortalResource {
     public PortalApisResource getPortalApisResource() {
         return resourceContext.getResource(PortalApisResource.class);
     }
-    
+
     @Path("media")
     public PortalMediaResource getPortalMediaResource() {
         return resourceContext.getResource(PortalMediaResource.class);
     }
 
-    @Path("identities")
-    public SocialIdentityProvidersResource getSocialIdentityProvidersResource() {
-        return resourceContext.getResource(SocialIdentityProvidersResource.class);
-    }
 }
