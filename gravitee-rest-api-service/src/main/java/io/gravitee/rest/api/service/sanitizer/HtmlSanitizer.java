@@ -85,16 +85,16 @@ public final class HtmlSanitizer {
         for (int i = 0; i < initialLines.length; i++) {
 
             if (i < sanitizedLines.length) {
-                String difference = StringUtils.difference(sanitizedLines[i], initialLines[i]);
-
+                String difference = StringUtils.difference(sanitizedLines[i].replaceAll("\\s", ""), initialLines[i].replaceAll("\\s", ""));
+                
                 if (!difference.isEmpty()) {
-                    diffMessage = "The content [" + difference + "] is not allowed (~line " + (i + 1)+ ")";
+                    diffMessage = "The content [" + difference + "] is not allowed (~line " + (i + 1) + ")";
                 }
             } else {
                 diffMessage = "The content [" + initialLines[i] + "] is not allowed";
             }
 
-            if(diffMessage != null) {
+            if (diffMessage != null) {
                 break;
             }
         }
